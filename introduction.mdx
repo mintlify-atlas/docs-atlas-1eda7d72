@@ -1,0 +1,113 @@
+---
+title: "Introduction to MTGBuilder"
+description: "Learn about MTGBuilder, a Haskell CLI tool that automatically generates Magic: The Gathering decks using algorithmic ranking systems"
+---
+
+## What is MTGBuilder?
+
+MTGBuilder is a command-line tool that automatically generates Magic: The Gathering decks by aggregating multiple deck lists using sophisticated algorithmic ranking systems. Written in Haskell, it provides a data-driven approach to deck construction by analyzing card popularity and synergies across multiple input decks.
+
+## The Problem It Solves
+
+When building a Magic deck for a specific archetype, players often face the challenge of combining insights from multiple deck lists. Questions arise like:
+
+- Which cards appear most frequently across successful builds?
+- How do specific card combinations perform together?
+- What's the optimal configuration when merging multiple variations of the same archetype?
+
+Manually aggregating this data is time-consuming and error-prone. MTGBuilder automates this process using mathematical ranking algorithms.
+
+## How It Works
+
+MTGBuilder implements Nth-order ranking algorithms to evaluate card popularity and synergy:
+
+<Steps>
+  <step>
+    **First-order rankings** measure individual card popularity across input decks
+  </step>
+  <step>
+    **Second-order rankings** evaluate two-card combinations and their frequency
+  </step>
+  <step>
+    **Third-order rankings** analyze three-card synergies (recommended default)
+  </step>
+  <step>
+    **Higher-order rankings** can be configured for more precise analysis
+  </step>
+</Steps>
+
+<Info>
+The algorithm is based on principles similar to Frank Karsten's aggregate deck list methodology. A detailed explanation of the mathematical approach can be found in [this blog post](http://elvishjerricco.github.io/2015/09/24/automatically-generating-magic-decks.html).
+</Info>
+
+## Key Features
+
+### Two Composition Algorithms
+
+**Subtractive Algorithm** (`-s` flag)
+- Starts with all cards from all input decks
+- Removes lowest-ranked cards until reaching target deck size
+- Best for understanding what to cut from an oversized card pool
+
+**Additive Algorithm** (default)
+- Starts with an empty deck (or optional seed deck)
+- Adds highest-ranked cards until reaching target deck size
+- Supports seed decks with `-i` flag to build around specific cards
+- Better performance and flexibility
+
+### Configurable Precision
+
+Control the order of rankings with the `-r` flag:
+- **1st order**: Equivalent to simple frequency analysis
+- **2nd order**: Considers pairwise card synergies
+- **3rd order** (default): Analyzes three-card combinations
+- Higher orders possible but computationally expensive
+
+### Main Deck and Sideboard Support
+
+MTGBuilder automatically handles both main deck and sideboard cards, processing them separately to generate complete 60-card main decks with 15-card sideboards.
+
+## When to Use MTGBuilder
+
+<Tip>
+**Ideal Use Cases:**
+- Aggregating tournament-winning lists of the same archetype
+- Creating a consensus build from multiple team members' lists
+- Analyzing the core cards and flex slots in an archetype
+- Building around specific cards using the seed deck feature
+</Tip>
+
+<Warning>
+**Not Recommended For:**
+- Creating completely new archetypes (requires existing deck lists)
+- Combining decks from different archetypes (results will be incoherent)
+- Small sample sizes (needs multiple input decks for meaningful results)
+</Warning>
+
+## Algorithm Background
+
+MTGBuilder's ranking system evaluates each card by examining all combinations that contain it:
+
+```haskell
+-- Ranking formula from src/MTGBuilder/Deck.hs:158
+rank = fromIntegral count * 1.0 / (2.0 ^ Set.size combo)
+```
+
+For each combination found in the input decks:
+- `count` is the number of input decks containing that combination
+- The rank is weighted by `1 / (2^n)` where n is the combination size
+- Lower-order combinations (individual cards) have more weight
+- Higher-order combinations (synergies) provide refinement
+
+This approach ensures that popular individual cards form the deck's foundation, while synergistic combinations influence the final card choices.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Set up the Haskell Platform and install MTGBuilder
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Generate your first deck in minutes
+  </Card>
+</CardGroup>

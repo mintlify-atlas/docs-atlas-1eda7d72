@@ -1,0 +1,187 @@
+---
+title: 'Command-Line Reference'
+description: 'Complete reference for all MTGBuilder command-line options and flags'
+---
+
+## Basic Usage
+
+The basic syntax for running MTGBuilder is:
+
+```bash
+mtg-builder [OPTIONS] input_deck_files...
+```
+
+You must provide at least one input deck file containing sample decklists. Multiple input files can be specified to build rankings from a larger dataset.
+
+## Command-Line Options
+
+### Input & Output Options
+
+<ParamField path="-o" type="string">
+  **Long form:** `--output=FILE`
+  
+  Specifies the output file where the generated deck will be written. If not specified, output is written to stdout.
+  
+  **Example:**
+  ```bash
+  mtg-builder -o generated_deck.txt inputs/*.txt
+  ```
+</ParamField>
+
+<ParamField path="-i" type="string">
+  **Long form:** `--input-seed=FILE`
+  
+  Input seed file containing cards to start with. Only applicable when using the additive algorithm (default mode). The generated deck will build upon the cards specified in this seed file.
+  
+  **Default:** None (starts with empty deck)
+  
+  **Example:**
+  ```bash
+  mtg-builder -i seed_deck.txt -o output.txt inputs/*.txt
+  ```
+</ParamField>
+
+### Algorithm Selection
+
+<ParamField path="-s" type="boolean">
+  **Long form:** `--subtractive`
+  
+  Use the subtractive algorithm instead of the default additive algorithm. The subtractive algorithm starts with all cards and removes the worst performers, while the additive algorithm starts empty and adds the best cards.
+  
+  **Default:** `false` (uses additive algorithm)
+  
+  **Example:**
+  ```bash
+  mtg-builder -s -o deck.txt inputs/*.txt
+  ```
+</ParamField>
+
+### Ranking Configuration
+
+<ParamField path="-r" type="number">
+  **Long form:** `--ranking=NUMBER`
+  
+  Order of rankings to compose the input decks with. This controls the precision of the ranking algorithm. Higher values provide more accurate rankings but increase computation time significantly.
+  
+  **Default:** `3` (third-order rankings)
+  
+  **Source:** app/Main.hs:78
+  
+  **Example:**
+  ```bash
+  mtg-builder -r 4 -o deck.txt inputs/*.txt
+  ```
+  
+  <Note>
+  Ranking order 3 is usually sufficient for most decks. Higher values (4-5) may provide marginal improvements at the cost of significantly longer processing time.
+  </Note>
+</ParamField>
+
+<ParamField path="-f" type="string">
+  **Long form:** `--ranking-file=FILE`
+  
+  File to save ranking information to. This outputs internal ranking data primarily used for debugging and algorithm analysis.
+  
+  **Default:** None (ranking info not saved)
+  
+  **Example:**
+  ```bash
+  mtg-builder -f rankings.txt -o deck.txt inputs/*.txt
+  ```
+</ParamField>
+
+### Debugging & Information
+
+<ParamField path="-v" type="boolean">
+  **Long form:** `--verbose`
+  
+  Enable verbose messages. Outputs additional information to stderr including parsing progress, final deck size, and the generated deck list.
+  
+  **Default:** `false`
+  
+  **Example:**
+  ```bash
+  mtg-builder -v -o deck.txt inputs/*.txt
+  ```
+</ParamField>
+
+<ParamField path="-V" type="boolean">
+  **Long form:** `--version`
+  
+  Print the version number and exit.
+  
+  **Example:**
+  ```bash
+  mtg-builder --version
+  # Output: Version 0.2.0.1
+  ```
+</ParamField>
+
+<ParamField path="-h" type="boolean">
+  **Long form:** `--help`
+  
+  Show help message with all available options and exit.
+  
+  **Example:**
+  ```bash
+  mtg-builder --help
+  ```
+</ParamField>
+
+## Complete Command Examples
+
+### Basic Generation
+
+```bash
+mtg-builder -o my_deck.txt sample_decks/*.txt
+```
+
+Generates a deck from all sample decklists in the `sample_decks` directory, writing output to `my_deck.txt`.
+
+### Using Subtractive Algorithm
+
+```bash
+mtg-builder -s -o competitive_deck.txt tournament_decks/*.txt
+```
+
+Uses the subtractive algorithm to generate a deck from tournament decklists.
+
+### Building from a Seed Deck
+
+```bash
+mtg-builder -i my_cards.txt -o improved_deck.txt meta_decks/*.txt
+```
+
+Starts with cards from `my_cards.txt` and builds a complete deck using the additive algorithm.
+
+### High Precision with Debug Info
+
+```bash
+mtg-builder -r 5 -f debug_rankings.txt -v -o deck.txt inputs/*.txt
+```
+
+Generates a deck with 5th-order rankings, saves ranking information for debugging, and enables verbose output.
+
+### Complete Example with All Options
+
+```bash
+mtg-builder \
+  -i seed.txt \
+  -o generated_deck.txt \
+  -r 4 \
+  -f rankings.txt \
+  -v \
+  deck1.txt deck2.txt deck3.txt
+```
+
+This command:
+- Starts with cards from `seed.txt`
+- Uses 4th-order rankings for higher precision
+- Saves ranking debug info to `rankings.txt`
+- Enables verbose output
+- Processes three input deck files
+- Writes the final deck to `generated_deck.txt`
+
+<Warning>
+Remember that `-i` (input-seed) only works with the additive algorithm. It has no effect when using `-s` (subtractive).
+</Warning>

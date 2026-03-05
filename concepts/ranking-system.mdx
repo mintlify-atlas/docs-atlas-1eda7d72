@@ -1,0 +1,289 @@
+---
+title: 'Ranking System'
+description: 'Understanding how MTGBuilder ranks cards using Nth-order combination popularity'
+---
+
+The ranking system is the core of MTGBuilder's deck composition algorithms. It determines which cards are most important based on their popularity and synergies across input decks.
+
+<Info>
+The ranking system extends [Frank Karsten's aggregate decklist algorithm](http://www.channelfireball.com/articles/magic-math-a-new-way-to-determine-an-aggregate-deck-list-rg-dragons/), which uses only first-order rankings.
+</Info>
+
+## Core Concept: Nth-Order Rankings
+
+From the source code (Deck.hs:40-58):
+
+<Note>
+**An Nth-order ranking is the popularity of a particular combination of N cards.**
+
+If six of the input decks run `Lightning Bolt #1 + Snapcaster Mage #1`, that combination gets a score of 6.
+</Note>
+
+The ranking data structure tracks:
+- **interaction**: A map of all card combinations found in input decks → count of decks containing that combination
+- **interactionSize**: The maximum order of combinations to consider (precision parameter)
+- **inputDecks**: All input decklists
+- **inputCards**: Union of all cards across inputs
+
+```haskell
+-- From Deck.hs:60-65
+data Ranking = MkRanking {
+    interaction     :: Map (Set Card) Int,
+    interactionSize :: Int,
+    inputDecks      :: [Deck],
+    inputCards      :: Deck
+}
+```
+
+## How Rankings Are Calculated
+
+When ranking a card, the algorithm examines every combination in the ranking map:
+
+<Steps>
+  <Step title="Find relevant combinations">
+    For each combination that:
+    1. Contains the card being ranked
+    2. Is a subset of the current deck
+  </Step>
+  
+  <Step title="Calculate weighted score">
+    Add to the card's ranking:
+    
+    ```haskell
+    -- From Deck.hs:158
+    rank = fromIntegral count * 1.0 / (2.0 ^ Set.size combo)
+    ```
+    
+    Where:
+    - `count` = number of input decks containing this combination
+    - `Set.size combo` = order of the combination (N)
+  </Step>
+  
+  <Step title="Sum all contributions">
+    The card's final ranking is the sum of all weighted scores from every relevant combination.
+  </Step>
+</Steps>
+
+### The Formula
+
+```
+Card Rank = Σ (popularity / 2^order) for all relevant combinations
+```
+
+Where:
+- **popularity** = count of input decks containing the combination
+- **order** = size of the combination (1st, 2nd, 3rd, etc.)
+
+<Info>
+**Why divide by 2^order?** This exponential weighting ensures lower-order combinations have more influence. A card's individual popularity (1st order) matters most, followed by two-card synergies (2nd order), then three-card combos (3rd order), etc.
+</Info>
+
+## Order Examples
+
+### 1st Order (Individual Cards)
+
+Frank Karsten's algorithm uses only 1st-order rankings.
+
+<Accordion title="Example: Lightning Bolt">
+  If Lightning Bolt #1 appears in 8 out of 10 input decks:
+  
+  ```
+  Popularity: 8
+  Order: 1
+  Contribution: 8 / 2^1 = 4.0
+  ```
+  
+  This is the card's baseline popularity score.
+</Accordion>
+
+### 2nd Order (Two-Card Synergies)
+
+2nd-order rankings capture which cards commonly appear together.
+
+<Accordion title="Example: Bolt + Snapcaster">
+  If the combination `{Lightning Bolt #1, Snapcaster Mage #1}` appears in 6 decks:
+  
+  ```
+  Popularity: 6
+  Order: 2
+  Contribution to each card: 6 / 2^2 = 1.5
+  ```
+  
+  When ranking Lightning Bolt in a deck that already has Snapcaster, this adds 1.5 to Bolt's score.
+  
+  **Total Bolt rank**: 4.0 (1st order) + 1.5 (2nd order) = 5.5
+</Accordion>
+
+### 3rd Order (Three-Card Combinations)
+
+3rd-order rankings capture three-card synergies and combos.
+
+<Accordion title="Example: Bolt + Snapcaster + Young Pyromancer">
+  If `{Lightning Bolt #1, Snapcaster Mage #1, Young Pyromancer #1}` appears in 4 decks:
+  
+  ```
+  Popularity: 4
+  Order: 3
+  Contribution to each card: 4 / 2^3 = 0.5
+  ```
+  
+  When ranking Lightning Bolt in a deck with both Snapcaster and Pyromancer, this adds 0.5.
+  
+  **Total Bolt rank**: 4.0 (1st) + 1.5 (2nd) + 0.5 (3rd) = 6.0
+</Accordion>
+
+### Higher Orders
+
+While the algorithm supports any order, the computational cost grows exponentially:
+
+```
+Order 4: contribution = popularity / 16
+Order 5: contribution = popularity / 32
+Order 6: contribution = popularity / 64
+```
+
+The diminishing returns make orders beyond 3 rarely worthwhile.
+
+## Precision vs Performance
+
+From the source code comments (Deck.hs:53-58):
+
+<Warning>
+**The interactionSize field is used to throttle computational expense at the cost of precision.**
+
+Higher precision requires analyzing more combinations, which grows exponentially.
+</Warning>
+
+### Computational Complexity
+
+For a deck with **C** unique cards:
+- **1st order**: C combinations
+- **2nd order**: C × (C-1) / 2 combinations
+- **3rd order**: C × (C-1) × (C-2) / 6 combinations
+
+Example with 60 unique cards:
+- 1st: 60 combinations
+- 2nd: 1,770 combinations
+- 3rd: 34,220 combinations
+- 4th: 487,635 combinations
+
+### Recommended Precision Levels
+
+| Order | Use Case | Performance | Accuracy |
+|-------|----------|-------------|----------|
+| **1** | Single archetype aggregation | Fast | Good for homogeneous decks |
+| **2** | Most general use cases | Moderate | Captures key synergies |
+| **3** | Diverse archetypes or combo decks | Slower | High precision |
+| **4+** | Experimental/research | Very slow | Marginal gains |
+
+<Note>
+**From Deck.hs:55-57**:
+- Precision beyond 3rd order likely isn't necessary
+- 2nd order is enough for most cases
+- 1st order is exactly Karsten's algorithm, only good for single-archetype aggregations
+</Note>
+
+## Setting Precision
+
+Use the `--ranking` (or `-r`) flag to set the maximum order:
+
+<CodeGroup>
+```bash 1st Order (Fastest)
+mtg-builder -r 1 -o output.txt deck1.txt deck2.txt deck3.txt
+```
+
+```bash 2nd Order (Recommended)
+mtg-builder -r 2 -o output.txt deck1.txt deck2.txt deck3.txt
+```
+
+```bash 3rd Order (High Precision)
+mtg-builder -r 3 -o output.txt deck1.txt deck2.txt deck3.txt
+```
+</CodeGroup>
+
+## How Rankings Influence Deck Composition
+
+<Tabs>
+  <Tab title="Subtractive Algorithm">
+    Cards are sorted by rank, and the **lowest-ranked** card is removed iteratively.
+    
+    ```haskell
+    -- From Deck.hs:133
+    (worstRank, worstCard) = head $ Set.toList sorted
+    ```
+    
+    Lower ranks = removed first
+  </Tab>
+  <Tab title="Additive Algorithm">
+    Cards are sorted by rank, and the **highest-ranked** card is added iteratively.
+    
+    ```haskell
+    -- From Deck.hs:188
+    (bestRank, bestCard) = minimumBy (flip compare) (swap <$> Map.toList rankMap)
+    ```
+    
+    Higher ranks = added first
+  </Tab>
+</Tabs>
+
+## Practical Example
+
+Suppose you're aggregating 10 Izzet decks:
+
+**Input Analysis**:
+- 9/10 decks run Lightning Bolt
+- 7/10 decks run Snapcaster Mage
+- 6/10 decks run both Bolt + Snapcaster
+- 5/10 decks run Bolt + Snapcaster + Cryptic Command
+
+**Rankings with r=3**:
+
+```
+Lightning Bolt:
+  1st order: 9 / 2^1 = 4.50
+  2nd order: 6 / 2^2 = 1.50  (with Snapcaster)
+  3rd order: 5 / 2^3 = 0.625 (with Snap + Cryptic)
+  Total: 6.625
+
+Snapcaster Mage:
+  1st order: 7 / 2^1 = 3.50
+  2nd order: 6 / 2^2 = 1.50  (with Bolt)
+  3rd order: 5 / 2^3 = 0.625 (with Bolt + Cryptic)
+  Total: 5.625
+
+Cryptic Command:
+  1st order: 5 / 2^1 = 2.50
+  3rd order: 5 / 2^3 = 0.625 (with Bolt + Snap)
+  Total: 3.125
+```
+
+Lightning Bolt ranks highest due to its strong individual popularity and multiple synergistic combinations.
+
+## Debugging Rankings
+
+Use the `--ranking-file` flag to dump the complete ranking map:
+
+```bash
+mtg-builder -r 2 --ranking-file=debug.txt -o output.txt deck*.txt
+```
+
+This outputs all combinations and their popularity counts (Deck.hs:100-104):
+
+```haskell
+dumpRanking :: Ranking -> String
+dumpRanking ranking = intercalate "\n" lines
+    where
+        lines = fmap (\(combo, count) -> show count ++ " : " ++ show combo) 
+                $ Map.toList $ interaction ranking
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Algorithms" icon="gears" href="/concepts/algorithms">
+    Learn how rankings drive the subtractive and additive algorithms
+  </Card>
+  <Card title="CLI Options" icon="terminal" href="/usage/commands">
+    Explore all command-line flags for controlling ranking precision
+  </Card>
+</CardGroup>

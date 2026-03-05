@@ -1,0 +1,256 @@
+---
+title: "MTGBuilder.Parser"
+description: "Parse Magic: The Gathering deck lists from strings and files"
+---
+
+# MTGBuilder.Parser
+
+The `MTGBuilder.Parser` module provides Parsec-based parsers for reading Magic: The Gathering deck lists in a standard text format.
+
+## Deck File Format
+
+The parser supports the following deck list format:
+
+```
+// Comments start with double slashes
+4 Lightning Bolt
+2 Snapcaster Mage
+4 [ZEN] Scalding Tarn
+
+SB: 3 Surgical Extraction
+SB: 2 Pyroblast
+
+// Alternative sideboard format:
+sideboard
+1 Grafdigger's Cage
+2 Ancient Grudge
+```
+
+### Format Specifications
+
+- **Mainboard cards**: `COUNT CARDNAME` or `COUNT [SET] CARDNAME`
+- **Sideboard cards (inline)**: `SB: COUNT CARDNAME`
+- **Sideboard section**: Cards after `sideboard` keyword
+- **Set codes**: Optional `[SET]` or `[SET_CODE]` after count
+- **Comments**: Lines starting with `//` are ignored
+- **Whitespace**: Flexible whitespace handling
+- **Case insensitive**: Keywords like `sideboard` are case-insensitive
+
+## Functions
+
+### deckParser
+
+A Parsec parser that parses a complete deck including mainboard and optional sideboard.
+
+```haskell
+deckParser :: Parser Deck
+```
+
+<ResponseField name="return" type="Parser Deck">
+  A Parsec `Parser` that returns a `Deck` (Set of Cards) when successful. Use with `parse` or `parseFromFile`.
+</ResponseField>
+
+**Example:**
+
+```haskell
+import MTGBuilder.Parser
+import Text.ParserCombinators.Parsec
+
+result = parse deckParser "my-deck.txt" deckContents
+case result of
+    Left err   -> putStrLn $ "Parse error: " ++ show err
+    Right deck -> putStrLn $ "Parsed " ++ show (Set.size deck) ++ " cards"
+```
+
+### parseDeckString
+
+Parses a deck list from a string.
+
+```haskell
+parseDeckString :: String -> Either ParseError Deck
+```
+
+<ParamField path="input" type="String" required>
+  The deck list as a string
+</ParamField>
+
+<ResponseField name="return" type="Either ParseError Deck">
+  Returns `Right Deck` on success, or `Left ParseError` if parsing fails
+</ResponseField>
+
+**Example:**
+
+```haskell
+import MTGBuilder.Parser
+import qualified Data.Set as Set
+
+let deckText = "4 Lightning Bolt\n2 Snapcaster Mage\nSB: 3 Surgical Extraction"
+case parseDeckString deckText of
+    Right deck -> do
+        putStrLn "Deck parsed successfully!"
+        putStrLn $ "Total cards: " ++ show (Set.size deck)
+    Left err -> 
+        putStrLn $ "Parse error: " ++ show err
+```
+
+### parseDeckFile
+
+Parses a deck list from a file.
+
+```haskell
+parseDeckFile :: FilePath -> IO (Either ParseError Deck)
+```
+
+<ParamField path="filePath" type="FilePath" required>
+  Path to the deck list file
+</ParamField>
+
+<ResponseField name="return" type="IO (Either ParseError Deck)">
+  Returns an IO action that produces `Right Deck` on success, or `Left ParseError` if parsing fails
+</ResponseField>
+
+**Example:**
+
+```haskell
+import MTGBuilder.Parser
+
+main :: IO ()
+main = do
+    result <- parseDeckFile "decks/jund.txt"
+    case result of
+        Right deck -> do
+            putStrLn "Successfully parsed deck!"
+            -- Process deck...
+        Left err -> do
+            putStrLn $ "Failed to parse: " ++ show err
+```
+
+### parseDeckFileOrFail
+
+Parses a deck list from a file, failing with an error message if parsing fails. This is the recommended function for use in the main application.
+
+```haskell
+parseDeckFileOrFail :: String -> ReaderT Options IO (String, Deck)
+```
+
+<ParamField path="filePath" type="String" required>
+  Path to the deck list file
+</ParamField>
+
+<ResponseField name="return" type="ReaderT Options IO (String, Deck)">
+  Returns a tuple of the file path and parsed deck. Prints verbose logging if `optVerbose` is enabled. Calls `fail` if parsing fails, propagating the error up the monad stack.
+</ResponseField>
+
+**Example:**
+
+```haskell
+import MTGBuilder.Parser
+import MTGBuilder.Options
+import Control.Monad.Reader
+import System.IO
+
+main :: IO ()
+main = do
+    let opts = Options {
+        optVerbose = True,
+        optWriteRanking = \_ -> return (),
+        optOutput = stdout,
+        optInputSeed = Nothing,
+        optSubtractive = False,
+        optPrecision = 2
+    }
+    
+    result <- runReaderT (parseDeckFileOrFail "deck1.txt") opts
+    case result of
+        (name, deck) -> do
+            putStrLn $ "Loaded " ++ name
+            putStrLn $ "Cards: " ++ show (Set.size deck)
+```
+
+## Parser Implementation Details
+
+The parser is built using Parsec and includes:
+
+### Token Parser
+
+```haskell
+deckTokens = Token.makeTokenParser $ emptyDef {
+    identStart = alphaNum <|> char '_',
+    commentLine = "//",
+    caseSensitive = False
+}
+```
+
+- **Comments**: `//` style comments
+- **Identifiers**: Start with alphanumeric or underscore
+- **Case insensitive**: Keywords are not case-sensitive
+
+### Card Parsing
+
+Each card line is parsed as:
+
+1. **Count**: Natural number (e.g., `4`)
+2. **Set code** (optional): Bracketed identifier (e.g., `[ZEN]`, `[M21]`)
+3. **Card name**: Everything up to end of line
+4. **Sideboard prefix** (optional): `SB:` marker
+
+**Note:** The parser creates individual `Card` instances for each copy. For example, `4 Lightning Bolt` creates 4 separate cards with copy numbers 1, 2, 3, and 4.
+
+## Error Handling
+
+Parsec provides detailed error messages including:
+
+- Line and column numbers
+- Expected tokens
+- Actual input received
+
+**Example Error:**
+
+```
+"deck.txt" (line 5, column 1):
+unexpected "X"
+expecting digit, "SB:" or "sideboard"
+```
+
+## Integration Example
+
+Complete example parsing multiple decks for aggregation:
+
+```haskell
+import MTGBuilder.Parser
+import MTGBuilder.Deck
+import MTGBuilder.Options
+import Control.Monad.Reader
+
+main :: IO ()
+main = do
+    let opts = Options {
+        optVerbose = True,
+        optWriteRanking = \_ -> return (),
+        optOutput = stdout,
+        optInputSeed = Nothing,
+        optSubtractive = False,
+        optPrecision = 2
+    }
+    
+    runReaderT buildAggregate opts
+  where
+    buildAggregate = do
+        -- Parse all input decks
+        decks <- mapM parseDeckFileOrFail ["deck1.txt", "deck2.txt", "deck3.txt"]
+        
+        -- Create ranking
+        ranking <- makeRanking 2 decks
+        
+        -- Compose final deck
+        finalDeck <- composeAdditive ranking (60, 15) Set.empty
+        
+        -- Output result
+        liftIO $ putStrLn $ dumpDeck finalDeck
+```
+
+## See Also
+
+- [MTGBuilder.Deck](/api/deck) - Core deck building functionality
+- [MTGBuilder.Options](/api/options) - Configuration options
+- [Parsec Documentation](https://hackage.haskell.org/package/parsec) - Parser combinator library

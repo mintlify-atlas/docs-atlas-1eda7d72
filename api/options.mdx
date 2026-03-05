@@ -1,0 +1,326 @@
+---
+title: "MTGBuilder.Options"
+description: "Configuration options for MTGBuilder runtime behavior"
+---
+
+# MTGBuilder.Options
+
+The `MTGBuilder.Options` module defines the `Options` data type used to configure runtime behavior throughout the MTGBuilder application. Options are typically passed through a `ReaderT Options IO` monad to all major functions.
+
+## Data Type
+
+### Options
+
+Configuration record controlling verbosity, output, and algorithm behavior.
+
+```haskell
+data Options = Options {
+    optVerbose      :: Bool,
+    optWriteRanking :: String -> IO (),
+    optOutput       :: Handle,
+    optInputSeed    :: Maybe String,
+    optSubtractive  :: Bool,
+    optPrecision    :: Int
+}
+```
+
+## Fields
+
+<ResponseField name="optVerbose" type="Bool" required>
+  **Enable verbose logging to stderr**
+  
+  When `True`, MTGBuilder prints detailed progress information including:
+  - Deck names as they're being ranked
+  - Current deck size during composition
+  - Card additions/removals with their ranking scores
+  
+  **Default:** `False`
+  
+  **Example:**
+  ```haskell
+  opts { optVerbose = True }
+  ```
+</ResponseField>
+
+<ResponseField name="optWriteRanking" type="String -> IO ()" required>
+  **Callback function to write ranking output**
+  
+  A function that takes the ranking dump string and performs an IO action (typically writing to a file or stdout). This allows the ranking to be saved for inspection.
+  
+  **Default:** `\_ -> return ()` (no-op)
+  
+  **Example:**
+  ```haskell
+  -- Write ranking to a file
+  opts { optWriteRanking = writeFile "ranking.txt" }
+  
+  -- Print ranking to stdout
+  opts { optWriteRanking = putStrLn }
+  ```
+</ResponseField>
+
+<ResponseField name="optOutput" type="Handle" required>
+  **Output file handle for the final deck**
+  
+  The file handle where the composed deck will be written. Use `stdout` for terminal output or a file handle obtained from `openFile`.
+  
+  **Default:** `stdout`
+  
+  **Example:**
+  ```haskell
+  -- Output to stdout
+  opts { optOutput = stdout }
+  
+  -- Output to file
+  h <- openFile "output.txt" WriteMode
+  let opts = defaultOpts { optOutput = h }
+  -- Don't forget to hClose h when done
+  ```
+</ResponseField>
+
+<ResponseField name="optInputSeed" type="Maybe String" required>
+  **Optional seed deck file for additive composition**
+  
+  When using additive composition (`optSubtractive = False`), you can provide a seed deck file. The composition algorithm will start with this deck and add cards to it. This is useful for building around specific cards or strategies.
+  
+  **Default:** `Nothing` (start with empty deck)
+  
+  **Example:**
+  ```haskell
+  -- No seed, start from scratch
+  opts { optInputSeed = Nothing }
+  
+  -- Build around cards in seed.txt
+  opts { optInputSeed = Just "seed.txt" }
+  ```
+</ResponseField>
+
+<ResponseField name="optSubtractive" type="Bool" required>
+  **Use subtractive composition algorithm**
+  
+  - `True`: Start with the union of all input decks and remove lowest-ranked cards (slower)
+  - `False`: Start with empty deck (or seed) and add highest-ranked cards (faster, recommended)
+  
+  **Default:** `False` (additive)
+  
+  **Example:**
+  ```haskell
+  -- Use recommended additive algorithm  
+  opts { optSubtractive = False }
+  
+  -- Use subtractive algorithm
+  opts { optSubtractive = True }
+  ```
+</ResponseField>
+
+<ResponseField name="optPrecision" type="Int" required>
+  **Ranking precision (interaction order)**
+  
+  Controls the maximum order of card combinations to consider when ranking:
+  - **1**: First-order only (individual card popularity) - Karsten's original algorithm
+  - **2**: Second-order (pairs) - good balance of speed and accuracy
+  - **3**: Third-order (triples) - most precise but computationally expensive
+  
+  Higher precision captures more subtle synergies but increases runtime exponentially.
+  
+  **Default:** `2`
+  
+  **Example:**
+  ```haskell
+  -- Fast, least precise
+  opts { optPrecision = 1 }
+  
+  -- Recommended default
+  opts { optPrecision = 2 }
+  
+  -- Maximum precision
+  opts { optPrecision = 3 }
+  ```
+</ResponseField>
+
+## Creating Options
+
+### Basic Example
+
+```haskell
+import MTGBuilder.Options
+import System.IO
+
+-- Minimal options for quick use
+defaultOpts :: Options
+defaultOpts = Options {
+    optVerbose = False,
+    optWriteRanking = \_ -> return (),
+    optOutput = stdout,
+    optInputSeed = Nothing,
+    optSubtractive = False,
+    optPrecision = 2
+}
+```
+
+### Command-Line Options Example
+
+```haskell
+import MTGBuilder.Options
+import System.Console.GetOpt
+import System.IO
+
+-- Parse command line and construct Options
+main :: IO ()
+main = do
+    args <- getArgs
+    let (flags, files, errors) = getOpt Permute optionDescriptors args
+    
+    -- Build options from flags
+    let opts = foldl (flip ($)) defaultOpts flags
+    
+    -- Use options...
+    runReaderT (buildDeck files) opts
+
+type Flag = Options -> Options
+
+optionDescriptors :: [OptDescr Flag]
+optionDescriptors =
+    [ Option ['v'] ["verbose"]
+        (NoArg (\o -> o { optVerbose = True }))
+        "Enable verbose output"
+    , Option ['s'] ["subtractive"]
+        (NoArg (\o -> o { optSubtractive = True }))
+        "Use subtractive composition"
+    , Option ['p'] ["precision"]
+        (ReqArg (\p o -> o { optPrecision = read p }) "INT")
+        "Set ranking precision (1-3)"
+    , Option ['r'] ["ranking"]
+        (ReqArg (\f o -> o { optWriteRanking = writeFile f }) "FILE")
+        "Write ranking to file"
+    , Option [] ["seed"]
+        (ReqArg (\f o -> o { optInputSeed = Just f }) "FILE")
+        "Seed deck file for additive composition"
+    ]
+```
+
+### Advanced Configuration
+
+```haskell
+import MTGBuilder.Options
+import System.IO
+import Control.Monad.Reader
+
+main :: IO ()
+main = do
+    -- Open output file
+    outHandle <- openFile "aggregate.txt" WriteMode
+    rankHandle <- openFile "ranking.txt" WriteMode
+    
+    let opts = Options {
+        optVerbose = True,
+        optWriteRanking = hPutStrLn rankHandle,
+        optOutput = outHandle,
+        optInputSeed = Just "core-cards.txt",
+        optSubtractive = False,
+        optPrecision = 3
+    }
+    
+    -- Run with options
+    runReaderT buildAggregate opts
+    
+    -- Clean up
+    hClose outHandle
+    hClose rankHandle
+```
+
+## Usage Pattern
+
+Options are typically used with the `ReaderT` monad transformer:
+
+```haskell
+import Control.Monad.Reader
+import MTGBuilder.Options
+import MTGBuilder.Deck
+import MTGBuilder.Parser
+
+buildAggregate :: [FilePath] -> ReaderT Options IO ()
+buildAggregate deckFiles = do
+    -- Read options within the ReaderT context
+    Options {optVerbose=verbose, optPrecision=precision} <- ask
+    
+    when verbose $ liftIO $ putStrLn "Parsing decks..."
+    
+    -- Parse input decks
+    decks <- mapM parseDeckFileOrFail deckFiles
+    
+    when verbose $ liftIO $ putStrLn "Building ranking..."
+    
+    -- Create ranking with precision from options
+    ranking <- makeRanking precision decks
+    
+    -- Write ranking if configured
+    Options {optWriteRanking=writeRank} <- ask
+    liftIO $ writeRank (dumpRanking ranking)
+    
+    -- Compose deck based on algorithm choice
+    Options {optSubtractive=subtractive, optInputSeed=seed} <- ask
+    finalDeck <- if subtractive
+        then composeDecks ranking (60, 15)
+        else do
+            seedDeck <- case seed of
+                Nothing -> return Set.empty
+                Just f  -> snd <$> parseDeckFileOrFail f
+            composeAdditive ranking (60, 15) seedDeck
+    
+    -- Write output
+    Options {optOutput=outHandle} <- ask
+    liftIO $ hPutStrLn outHandle (dumpDeck finalDeck)
+
+main :: IO ()
+main = do
+    let opts = defaultOpts { optVerbose = True, optPrecision = 2 }
+    runReaderT (buildAggregate ["deck1.txt", "deck2.txt"]) opts
+```
+
+## Recommended Configurations
+
+### Quick Single-Archetype Aggregate
+
+```haskell
+Options {
+    optVerbose = False,
+    optWriteRanking = \_ -> return (),
+    optOutput = stdout,
+    optInputSeed = Nothing,
+    optSubtractive = False,
+    optPrecision = 1  -- Fast, simple
+}
+```
+
+### Standard Multi-Archetype Aggregate
+
+```haskell
+Options {
+    optVerbose = True,
+    optWriteRanking = writeFile "ranking.txt",
+    optOutput = stdout,
+    optInputSeed = Nothing,
+    optSubtractive = False,
+    optPrecision = 2  -- Balanced
+}
+```
+
+### High-Precision Build-Around
+
+```haskell
+Options {
+    optVerbose = True,
+    optWriteRanking = writeFile "ranking.txt",
+    optOutput = stdout,
+    optInputSeed = Just "core.txt",  -- Build around specific cards
+    optSubtractive = False,
+    optPrecision = 3  -- Maximum precision
+}
+```
+
+## See Also
+
+- [MTGBuilder.Deck](/api/deck) - Functions that use Options
+- [MTGBuilder.Parser](/api/parser) - Parsing functions that use Options
+- [Control.Monad.Reader](https://hackage.haskell.org/package/mtl/docs/Control-Monad-Reader.html) - ReaderT monad documentation

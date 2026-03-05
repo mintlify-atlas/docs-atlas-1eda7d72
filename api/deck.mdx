@@ -1,0 +1,274 @@
+---
+title: "MTGBuilder.Deck"
+description: "Core deck building and ranking functionality for Magic: The Gathering deck aggregation"
+---
+
+# MTGBuilder.Deck
+
+The `MTGBuilder.Deck` module provides the core functionality for ranking and composing Magic: The Gathering decks using Frank Karsten's aggregate deck list algorithm with higher-order interactions.
+
+## Data Types
+
+### Card
+
+Represents a single card in a deck, including support for multiple copies and sideboard cards.
+
+```haskell
+data Card = MkCard {
+    name        :: String,
+    copy        :: Int,
+    isSideboard :: Bool
+} deriving (Eq, Ord)
+```
+
+<Accordion title="Card Fields">
+  <ResponseField name="name" type="String" required>
+    The name of the card (e.g., "Lightning Bolt", "Snapcaster Mage")
+  </ResponseField>
+  
+  <ResponseField name="copy" type="Int" required>
+    The copy number of this card (1-4 for most cards). Each copy is treated as a distinct card in the ranking algorithm.
+  </ResponseField>
+  
+  <ResponseField name="isSideboard" type="Bool" required>
+    Whether this card is part of the sideboard (`True`) or mainboard (`False`)
+  </ResponseField>
+</Accordion>
+
+**Example:**
+
+```haskell
+-- First copy of Lightning Bolt in mainboard
+mainCard = MkCard { name = "Lightning Bolt", copy = 1, isSideboard = False }
+
+-- Second copy of Thoughtseize in sideboard
+sideCard = MkCard { name = "Thoughtseize", copy = 2, isSideboard = True }
+```
+
+### Deck
+
+A deck is represented as a set of cards.
+
+```haskell
+type Deck = Set Card
+```
+
+### Ranking
+
+The ranking data structure tracks card combinations and their popularity across multiple input decks.
+
+```haskell
+data Ranking = MkRanking {
+    interaction     :: Map (Set Card) Int,
+    interactionSize :: Int,
+    inputDecks      :: [Deck],
+    inputCards      :: Deck
+}
+```
+
+<Accordion title="Ranking Fields">
+  <ResponseField name="interaction" type="Map (Set Card) Int" required>
+    Maps each combination of cards to the number of input decks that contain that exact combination. For example, if 6 decks run both Lightning Bolt #1 and Snapcaster Mage #1, that 2-card combination has a score of 6.
+  </ResponseField>
+  
+  <ResponseField name="interactionSize" type="Int" required>
+    The maximum order of ranking to compute (1-3 recommended). This controls the computational expense:
+    - **1st order**: Cards ranked individually (Karsten's original algorithm)
+    - **2nd order**: Considers 2-card interactions (sufficient for most cases)
+    - **3rd order**: Considers 3-card interactions (higher precision)
+  </ResponseField>
+  
+  <ResponseField name="inputDecks" type="[Deck]" required>
+    The list of all input decks being aggregated
+  </ResponseField>
+  
+  <ResponseField name="inputCards" type="Deck" required>
+    The union of all cards across all input decks
+  </ResponseField>
+</Accordion>
+
+## Functions
+
+### makeRanking
+
+Creates a ranking from a list of named decks, computing card combination popularity up to the specified order.
+
+```haskell
+makeRanking :: Int -> [(String, Deck)] -> ReaderT Options IO Ranking
+```
+
+<ParamField path="size" type="Int" required>
+  The maximum interaction size (order) to compute. Recommended values:
+  - `1`: First-order only (fastest, least precise)
+  - `2`: Second-order interactions (good balance)
+  - `3`: Third-order interactions (most precise, slowest)
+</ParamField>
+
+<ParamField path="inputDecks" type="[(String, Deck)]" required>
+  A list of tuples containing deck names and their corresponding deck data. The names are used for verbose logging.
+</ParamField>
+
+<ResponseField name="return" type="ReaderT Options IO Ranking">
+  Returns a `Ranking` that can be used with composition functions. Runs in the `ReaderT Options IO` monad to support verbose logging.
+</ResponseField>
+
+**Example:**
+
+```haskell
+import MTGBuilder.Deck
+import MTGBuilder.Options
+import Control.Monad.Reader
+import qualified Data.Set as Set
+
+main :: IO ()
+main = do
+    let deck1 = Set.fromList [MkCard "Lightning Bolt" 1 False, MkCard "Snapcaster Mage" 1 False]
+    let deck2 = Set.fromList [MkCard "Lightning Bolt" 1 False, MkCard "Snapcaster Mage" 1 False]
+    let namedDecks = [("Deck A", deck1), ("Deck B", deck2)]
+    
+    let opts = Options {
+        optVerbose = True,
+        optWriteRanking = \_ -> return (),
+        optOutput = stdout,
+        optInputSeed = Nothing,
+        optSubtractive = False,
+        optPrecision = 2
+    }
+    
+    ranking <- runReaderT (makeRanking 2 namedDecks) opts
+    -- Use ranking for composition...
+```
+
+### composeAdditive
+
+Builds a deck by starting with a seed and iteratively adding the highest-ranked cards. This is the recommended composition method for performance and flexibility.
+
+```haskell
+composeAdditive :: Ranking -> (Int, Int) -> Deck -> ReaderT Options IO Deck
+```
+
+<ParamField path="ranking" type="Ranking" required>
+  The ranking computed by `makeRanking`
+</ParamField>
+
+<ParamField path="sizes" type="(Int, Int)" required>
+  A tuple of `(maindeckSize, sideboardSize)`. Typically `(60, 15)` for constructed formats.
+</ParamField>
+
+<ParamField path="seed" type="Deck" required>
+  The starting deck to build from. Use `Set.empty` to start from scratch, or provide specific cards you want to build around.
+</ParamField>
+
+<ResponseField name="return" type="ReaderT Options IO Deck">
+  Returns the composed deck with the specified sizes
+</ResponseField>
+
+**Example:**
+
+```haskell
+-- Build a 60-card mainboard and 15-card sideboard, starting from empty
+composedDeck <- runReaderT (composeAdditive ranking (60, 15) Set.empty) opts
+
+-- Build around a specific card
+let seed = Set.singleton (MkCard "Tarmogoyf" 1 False)
+composedDeck <- runReaderT (composeAdditive ranking (60, 15) seed) opts
+```
+
+### composeDecks
+
+Builds a deck by starting with the union of all input decks and iteratively removing the lowest-ranked cards (subtractive method).
+
+```haskell
+composeDecks :: Ranking -> (Int, Int) -> ReaderT Options IO Deck
+```
+
+<ParamField path="ranking" type="Ranking" required>
+  The ranking computed by `makeRanking`
+</ParamField>
+
+<ParamField path="sizes" type="(Int, Int)" required>
+  A tuple of `(maindeckSize, sideboardSize)`
+</ParamField>
+
+<ResponseField name="return" type="ReaderT Options IO Deck">
+  Returns the composed deck with the specified sizes
+</ResponseField>
+
+**Note:** This method is slower than `composeAdditive` and doesn't allow specifying a seed deck. Use `composeAdditive` unless you specifically need subtractive composition.
+
+### dumpDeck
+
+Converts a deck to a human-readable string format suitable for saving to a file or display.
+
+```haskell
+dumpDeck :: Deck -> String
+```
+
+<ParamField path="deck" type="Deck" required>
+  The deck to format
+</ParamField>
+
+<ResponseField name="return" type="String">
+  A string with one card per line in the format:
+  - Mainboard cards: `COUNT CARDNAME`
+  - Sideboard cards: `SB: COUNT CARDNAME`
+  
+  Multiple copies of the same card are consolidated into a single line with the total count.
+</ResponseField>
+
+**Example Output:**
+
+```
+4 Lightning Bolt
+2 Snapcaster Mage
+4 Brainstorm
+SB: 3 Surgical Extraction
+SB: 2 Pyroblast
+```
+
+### dumpRanking
+
+Converts a ranking to a human-readable string showing all card combinations and their popularity scores.
+
+```haskell
+dumpRanking :: Ranking -> String
+```
+
+<ParamField path="ranking" type="Ranking" required>
+  The ranking to format
+</ParamField>
+
+<ResponseField name="return" type="String">
+  A string with one combination per line in the format: `COUNT : [Card1, Card2, ...]`
+</ResponseField>
+
+**Example Output:**
+
+```
+8 : [Lightning Bolt #1]
+6 : [Lightning Bolt #1, Snapcaster Mage #1]
+5 : [Brainstorm #1]
+3 : [Lightning Bolt #1, Snapcaster Mage #1, Brainstorm #1]
+```
+
+## Algorithm Overview
+
+The module implements an enhanced version of Frank Karsten's aggregate deck list algorithm:
+
+1. **Ranking**: Each card combination's popularity is computed across all input decks
+2. **Scoring**: Cards are scored based on their combinations:
+   - Score = Σ (popularity × 1 / 2^order) for each combination containing the card
+   - Lower-order combinations are weighted more heavily
+3. **Composition**: Either additively build up or subtractively trim down to target size
+
+### Performance Characteristics
+
+- **1st order**: O(n) where n = number of unique cards
+- **2nd order**: O(n²) - recommended for most use cases
+- **3rd order**: O(n³) - use only when high precision is needed
+
+## See Also
+
+- [MTGBuilder.Parser](/api/parser) - Parse deck files
+- [MTGBuilder.Combination](/api/combination) - Generate card combinations
+- [MTGBuilder.Options](/api/options) - Configuration options

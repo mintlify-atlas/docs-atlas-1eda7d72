@@ -1,80 +1,279 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quick Start"
+description: "Generate your first Magic: The Gathering deck with MTGBuilder in minutes"
 ---
 
-## Get started in three steps
+## Your First Deck Generation
 
-Get your documentation site running locally and make your first customization.
+This guide will walk you through creating an aggregate deck from multiple input deck lists.
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Steps>
+  <step>
+    ### Prepare Input Deck Files
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    Create text files containing your deck lists. MTGBuilder uses a simple, human-readable format.
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    **Example deck file (`deck1.txt`):**
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```text
+    4 Lightning Bolt
+    4 Snapcaster Mage
+    3 Cryptic Command
+    2 Scalding Tarn
+    4 Steam Vents
+    20 Island
+    8 Mountain
+    
+    SB: 3 Blood Moon
+    SB: 2 Surgical Extraction
+    ```
+    
+    <Info>
+    **Deck Format Rules:**
+    - Each line starts with a number (quantity) followed by the card name
+    - Sideboard cards are prefixed with `SB:`
+    - You can optionally specify set codes in brackets: `4 [KTK] Flooded Strand`
+    - Comments start with `//`
+    - Blank lines are ignored
+    
+    See the parser implementation in `src/MTGBuilder/Parser.hs:46-60` for full format details.
+    </Info>
+  </step>
+  
+  <step>
+    ### Run MTGBuilder
+    
+    Generate an aggregate deck from your input files using the default additive algorithm:
+    
+    ```bash
+    mtg-builder deck1.txt deck2.txt deck3.txt -o output.txt
+    ```
+    
+    This command:
+    - Reads three input deck files
+    - Analyzes card rankings using 3rd-order combinations (default)
+    - Builds a 60-card main deck + 15-card sideboard
+    - Writes the result to `output.txt`
+  </step>
+  
+  <step>
+    ### Review the Output
+    
+    Open `output.txt` to see your generated deck:
+    
+    ```text
+    4 Lightning Bolt
+    4 Snapcaster Mage
+    3 Cryptic Command
+    2 Scalding Tarn
+    ...
+    SB: 3 Blood Moon
+    SB: 2 Surgical Extraction
+    ...
+    ```
+    
+    The output format matches the input format, making it easy to import into deck-building tools or Arena.
+  </step>
+  
+  <step>
+    ### Experiment with Options
+    
+    Try different algorithms and settings:
+    
+    ```bash
+    # Use verbose mode to see progress
+    mtg-builder -v deck1.txt deck2.txt deck3.txt -o output.txt
+    
+    # Use the subtractive algorithm
+    mtg-builder -s deck1.txt deck2.txt deck3.txt -o output.txt
+    
+    # Adjust ranking precision to 2nd order for faster processing
+    mtg-builder -r 2 deck1.txt deck2.txt deck3.txt -o output.txt
+    ```
+  </step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+## Example Workflow
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+Here's a complete example of aggregating multiple tournament-winning deck lists:
 
-### Step 3: Go live
+<CodeGroup>
+```bash Basic Usage
+# Generate aggregate deck from multiple inputs
+mtg-builder jeskai1.txt jeskai2.txt jeskai3.txt -o jeskai_aggregate.txt
+```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+```bash Verbose Output
+# See detailed progress and deck size information
+mtg-builder -v jeskai1.txt jeskai2.txt jeskai3.txt -o jeskai_aggregate.txt
+```
 
-## Next steps
+```bash With Seed Deck
+# Build around specific core cards
+mtg-builder -i seed.txt jeskai1.txt jeskai2.txt jeskai3.txt -o jeskai_aggregate.txt
+```
 
-Now that you have your docs running, explore these key features:
+```bash Subtractive Algorithm
+# Start with everything and remove worst cards
+mtg-builder -s jeskai1.txt jeskai2.txt jeskai3.txt -o jeskai_aggregate.txt
+```
 
-<CardGroup cols={2}>
+```bash Debug Rankings
+# Save ranking information for analysis
+mtg-builder -f rankings.txt jeskai1.txt jeskai2.txt jeskai3.txt -o output.txt
+```
+</CodeGroup>
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+## Understanding the Output
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+### Deck Composition
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+MTGBuilder generates a standard 75-card deck:
+- **60 cards** in the main deck
+- **15 cards** in the sideboard
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+These sizes are hardcoded in `app/Main.hs:105` and `app/Main.hs:108` as `(60, 15)`.
 
-</CardGroup>
+### Card Selection Process
+
+The algorithm evaluates each card based on:
+
+1. **Individual popularity**: How many input decks include this card?
+2. **Synergy ratings**: How often does this card appear with other cards in the deck?
+3. **Weighted rankings**: Lower-order combinations weighted more heavily than higher-order ones
+
+<Tip>
+Cards that appear in more input decks and have strong synergies with other popular cards will rank higher and be included in the final deck.
+</Tip>
+
+## Command Reference
+
+All available options:
+
+```bash
+mtg-builder [args] input_deck_files...
+```
+
+| Flag | Long Form | Description |
+|------|-----------|-------------|
+| `-o FILE` | `--output=FILE` | Output file (default: stdout) |
+| `-i FILE` | `--input-seed=FILE` | Seed deck for additive algorithm |
+| `-r NUMBER` | `--ranking=NUMBER` | Order of rankings (default: 3) |
+| `-f FILE` | `--ranking-file=FILE` | Save ranking debug info |
+| `-v` | `--verbose` | Enable verbose messages |
+| `-s` | `--subtractive` | Use subtractive algorithm |
+| `-V` | `--version` | Print version |
+| `-h` | `--help` | Show help |
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+These options are implemented in `app/Main.hs:18-69` using Haskell's GetOpt library.
 </Note>
+
+## Advanced Usage: Seed Decks
+
+The additive algorithm supports starting with a seed deck - a set of core cards you want to build around:
+
+<Steps>
+  <step>
+    **Create a seed file (`seed.txt`):**
+    
+    ```text
+    4 Lightning Bolt
+    4 Snapcaster Mage
+    4 Scalding Tarn
+    ```
+  </step>
+  
+  <step>
+    **Run with the `-i` flag:**
+    
+    ```bash
+    mtg-builder -i seed.txt deck1.txt deck2.txt deck3.txt -o output.txt
+    ```
+  </step>
+  
+  <step>
+    **Result:**
+    
+    The output deck will include all cards from `seed.txt` plus the highest-ranked cards from the input decks that synergize with your seed cards.
+  </step>
+</Steps>
+
+<Warning>
+Seed decks only work with the additive algorithm (default). The `-i` flag is ignored when using `-s` (subtractive mode).
+
+See `app/Main.hs:107-108` for implementation details.
+</Warning>
+
+## Verbose Mode Details
+
+When using `-v`, MTGBuilder prints progress information to stderr:
+
+```bash
+mtg-builder -v deck1.txt deck2.txt deck3.txt -o output.txt
+```
+
+Example verbose output:
+```
+Hello!
+Parsing deck: deck1.txt
+Ranking deck1.txt
+Parsing deck: deck2.txt
+Ranking deck2.txt
+Parsing deck: deck3.txt
+Ranking deck3.txt
+Final size: 75
+```
+
+The verbose messages are implemented throughout the codebase:
+- `app/Main.hs:100`: "Hello!" greeting
+- `src/MTGBuilder/Parser.hs:73`: Deck parsing notifications
+- `src/MTGBuilder/Deck.hs:78`: Ranking progress
+- `app/Main.hs:109`: Final deck size
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Algorithm Details" icon="brain" href="/concepts/algorithms">
+    Deep dive into the ranking mathematics
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/usage/commands">
+    Complete command-line documentation
+  </Card>
+  <Card title="Deck Format" icon="file" href="/usage/input-format">
+    Full specification of input/output formats
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/installation#troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>
+
+## Tips for Best Results
+
+<Accordion title="Input Deck Selection">
+  - Use 5-10 input decks for meaningful statistical analysis
+  - Ensure all input decks are the same archetype or strategy
+  - Include recent, successful tournament lists when possible
+  - Avoid mixing different meta positions (e.g., don't combine aggro and control)
+</Accordion>
+
+<Accordion title="Algorithm Choice">
+  **Use Additive (default) when:**
+  - You want to build around specific cards (with `-i` seed deck)
+  - You're working with many input decks
+  - Performance is important
+  
+  **Use Subtractive (`-s`) when:**
+  - You want to understand what to cut from a card pool
+  - You're combining only 2-3 similar lists
+  - You want to see the collective before cuts
+</Accordion>
+
+<Accordion title="Ranking Precision">
+  - **`-r 1`**: Fast, equivalent to simple frequency count (Frank Karsten's method)
+  - **`-r 2`**: Good balance of speed and accuracy for most use cases
+  - **`-r 3`**: Default, recommended for comprehensive analysis
+  - **`-r 4+`**: Computationally expensive, minimal improvement
+  
+  Higher orders are unlikely to change results significantly but will increase processing time exponentially.
+</Accordion>

@@ -1,97 +1,227 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "MTGBuilder Documentation"
+mode: "custom"
 ---
 
-## Setting up
+<div className="relative overflow-hidden bg-gradient-to-br from-[#8B5CF6] via-[#7C3AED] to-[#6D28D9] dark:from-[#1a1d27] dark:via-[#2a1f3f] dark:to-[#1a1d27] py-20">
+  <div className="absolute inset-0 bg-black/20 dark:bg-black/40"></div>
+  <div className="relative max-w-6xl mx-auto px-6 lg:px-8">
+    <div className="grid lg:grid-cols-12 gap-8 items-center">
+      <div className="lg:col-span-7">
+        <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white mb-4">
+          MTGBuilder
+        </h1>
+        <p className="text-lg sm:text-xl text-white/90 mb-8 max-w-2xl">
+          Automatically generate Magic: The Gathering decks using sophisticated algorithmic ranking systems that analyze card popularity and synergies across multiple deck lists.
+        </p>
+        <div className="flex flex-wrap gap-4">
+          <a
+            href="/quickstart"
+            className="inline-flex items-center px-6 py-3 rounded-lg bg-white text-[#8B5CF6] font-semibold hover:bg-gray-100 transition-colors"
+          >
+            Get Started
+          </a>
+          <a
+            href="/introduction"
+            className="inline-flex items-center px-6 py-3 rounded-lg border border-white/30 bg-white/10 text-white font-semibold hover:bg-white/20 transition-colors"
+          >
+            Learn More
+          </a>
+        </div>
+      </div>
+      <div className="lg:col-span-5 hidden lg:block">
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-2xl blur-3xl"></div>
+          <div className="relative bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-white font-mono text-sm">
+            <div className="text-purple-300">{"# Generate a deck"}</div>
+            <div className="mt-2">{"mtg-builder input1.txt input2.txt \\"}</div>
+            <div className="ml-4">{"-o output.txt \\"}</div>
+            <div className="ml-4">{"-r 3"}</div>
+            <div className="mt-4 text-green-300">{"# Building with 3rd-order rankings..."}</div>
+            <div className="text-green-300">{"# Final size: 75"}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-Get your documentation site up and running in minutes.
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+    Quick Start
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Get MTGBuilder up and running in three simple steps.
+  </p>
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+  <Steps>
+    <Step title="Install MTGBuilder">
+      Install MTGBuilder via Cabal from Hackage. You'll need the Haskell Platform installed on your system.
 
-## Make it yours
+      ```bash
+      cabal install MTGBuilder
+      ```
 
-Design a docs site that looks great and empowers your users.
+      This installs the `mtg-builder` command-line tool globally.
+    </Step>
+    
+    <Step title="Prepare your input decks">
+      Create deck list files in the standard MTG format. Each file should contain one deck list with card names and quantities.
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+      ```text deck1.txt
+      4 Lightning Bolt
+      4 Snapcaster Mage
+      3 Cryptic Command
+      2 Jace, the Mind Sculptor
+      ```
 
-## Create beautiful pages
+      You can use any number of input deck files to analyze different archetypes or variations.
+    </Step>
+    
+    <Step title="Generate your deck">
+      Run MTGBuilder with your input files to generate an optimized deck based on card popularity rankings.
 
-Everything you need to create world-class documentation.
+      ```bash
+      mtg-builder deck1.txt deck2.txt deck3.txt -o output.txt -r 3
+      ```
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+      <Accordion title="Example Output">
+        The tool will output a 60-card mainboard and 15-card sideboard based on the ranking analysis:
+        
+        ```text
+        4 Lightning Bolt
+        4 Snapcaster Mage
+        3 Cryptic Command
+        2 Jace, the Mind Sculptor
+        ...
+        SB: 2 Wear // Tear
+        SB: 3 Dispel
+        ```
+      </Accordion>
+    </Step>
+  </Steps>
+</div>
 
-## Need inspiration?
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+    Explore by Topic
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Dive deeper into MTGBuilder's features and capabilities.
+  </p>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+  <CardGroup cols={2}>
+    <Card title="Command Reference" icon="terminal" href="/usage/commands">
+      Complete guide to all CLI commands, flags, and options available in mtg-builder.
+    </Card>
+    <Card title="Algorithm Overview" icon="brain" href="/concepts/algorithms">
+      Learn how the additive and subtractive composition algorithms work.
+    </Card>
+    <Card title="Ranking System" icon="ranking-star" href="/concepts/ranking-system">
+      Understand the Nth-order ranking system that powers deck generation.
+    </Card>
+    <Card title="Input Format" icon="file-lines" href="/usage/input-format">
+      Learn the deck list format and how to structure your input files.
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+    Key Features
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Powerful tools for automatic deck construction.
+  </p>
+
+  <div className="grid md:grid-cols-2 gap-6">
+    <div className="border dark:border-[#27272a] border-gray-200 rounded-xl p-6 bg-white dark:bg-[#1a1d27]">
+      <div className="w-12 h-12 rounded-lg bg-[#8B5CF6]/10 dark:bg-[#8B5CF6]/20 flex items-center justify-center mb-4">
+        <svg className="w-6 h-6 text-[#8B5CF6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Dual Algorithms</h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400">
+        Choose between additive (build up from seed) and subtractive (trim down from union) approaches for deck generation.
+      </p>
+    </div>
+
+    <div className="border dark:border-[#27272a] border-gray-200 rounded-xl p-6 bg-white dark:bg-[#1a1d27]">
+      <div className="w-12 h-12 rounded-lg bg-[#8B5CF6]/10 dark:bg-[#8B5CF6]/20 flex items-center justify-center mb-4">
+        <svg className="w-6 h-6 text-[#8B5CF6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Nth-Order Rankings</h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400">
+        Configurable precision levels analyze not just individual card popularity but also card combinations and synergies.
+      </p>
+    </div>
+
+    <div className="border dark:border-[#27272a] border-gray-200 rounded-xl p-6 bg-white dark:bg-[#1a1d27]">
+      <div className="w-12 h-12 rounded-lg bg-[#8B5CF6]/10 dark:bg-[#8B5CF6]/20 flex items-center justify-center mb-4">
+        <svg className="w-6 h-6 text-[#8B5CF6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
+        </svg>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Sideboard Support</h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400">
+        Automatically handles both mainboard and sideboard cards, generating complete 75-card lists ready for tournament play.
+      </p>
+    </div>
+
+    <div className="border dark:border-[#27272a] border-gray-200 rounded-xl p-6 bg-white dark:bg-[#1a1d27]">
+      <div className="w-12 h-12 rounded-lg bg-[#8B5CF6]/10 dark:bg-[#8B5CF6]/20 flex items-center justify-center mb-4">
+        <svg className="w-6 h-6 text-[#8B5CF6]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+        </svg>
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Seed Decks</h3>
+      <p className="text-sm text-gray-600 dark:text-gray-400">
+        Provide a seed deck with core cards to build around, perfect for exploring variations of an existing archetype.
+      </p>
+    </div>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+    API Reference
+  </h2>
+  <p className="text-base text-gray-600 dark:text-gray-400 mb-8">
+    Use MTGBuilder as a Haskell library in your own projects.
+  </p>
+
+  <CardGroup cols={2}>
+    <Card title="Deck Module" icon="cards-blank" href="/api/deck">
+      Core deck composition functions including ranking and algorithm implementations.
+    </Card>
+    <Card title="Parser Module" icon="file-code" href="/api/parser">
+      Parse deck lists from text files into structured Card and Deck types.
+    </Card>
+    <Card title="Combination Module" icon="diagram-project" href="/api/combination">
+      Generate all k-combinations of cards for ranking calculations.
+    </Card>
+    <Card title="Options Module" icon="sliders" href="/api/options">
+      Configuration options and command-line argument handling.
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="border dark:border-[#27272a] border-gray-200 rounded-2xl p-8 bg-gradient-to-br from-[#8B5CF6]/5 to-[#7C3AED]/5 dark:from-[#8B5CF6]/10 dark:to-[#7C3AED]/10">
+    <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-3">
+      Ready to build optimal decks?
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 mb-6">
+      Install MTGBuilder and start generating data-driven deck lists in minutes.
+    </p>
+    <a
+      href="/installation"
+      className="inline-flex items-center px-6 py-3 rounded-lg bg-[#8B5CF6] text-white font-semibold hover:bg-[#7C3AED] transition-colors"
+    >
+      Get Started Now
+    </a>
+  </div>
+</div>

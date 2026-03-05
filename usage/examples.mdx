@@ -1,0 +1,399 @@
+---
+title: 'Usage Examples'
+description: 'Real-world examples of using MTGBuilder to generate Magic: The Gathering decks'
+---
+
+## Example 1: Basic Deck Generation
+
+The simplest use case: generate a deck from sample decklists.
+
+### Input Files
+
+Create sample deck files to learn from:
+
+**sample1.txt:**
+```txt
+4 Lightning Bolt
+4 Monastery Swiftspear
+4 Goblin Guide
+4 Eidolon of the Great Revel
+4 Lava Spike
+4 Rift Bolt
+4 Boros Charm
+4 Light Up the Stage
+8 Mountain
+4 Sacred Foundry
+4 Bloodstained Mire
+4 Wooded Foothills
+```
+
+**sample2.txt:**
+```txt
+4 Lightning Bolt
+4 Lava Spike
+4 Monastery Swiftspear
+4 Eidolon of the Great Revel
+4 Skewer the Critics
+4 Boros Charm
+3 Lightning Helix
+10 Mountain
+4 Sacred Foundry
+3 Inspiring Vantage
+```
+
+### Command
+
+```bash
+mtg-builder -o generated.txt sample1.txt sample2.txt
+```
+
+### Expected Output
+
+The tool analyzes both input decks and generates a 60-card mainboard + 15-card sideboard based on card rankings:
+
+**generated.txt:**
+```txt
+4 Lightning Bolt
+4 Monastery Swiftspear
+4 Eidolon of the Great Revel
+4 Lava Spike
+4 Boros Charm
+4 Goblin Guide
+// ... (remaining cards to reach 60)
+9 Mountain
+4 Sacred Foundry
+// ... (remaining lands)
+```
+
+<Note>
+The exact output depends on the ranking algorithm's analysis of card synergies and performance patterns in the input decks.
+</Note>
+
+---
+
+## Example 2: Using the Subtractive Algorithm
+
+The subtractive algorithm starts with all cards from input decks and removes the worst performers.
+
+### Input File
+
+**control_deck.txt:**
+```txt
+// Control deck
+4 Counterspell
+3 Mana Leak
+2 Force of Will
+4 Brainstorm
+4 Ponder
+3 Jace, the Mind Sculptor
+2 Terminus
+2 Supreme Verdict
+4 Snapcaster Mage
+10 Island
+4 Flooded Strand
+3 Hallowed Fountain
+2 Plains
+```
+
+### Command
+
+```bash
+mtg-builder -s -o control_generated.txt control_deck.txt
+```
+
+### What Happens
+
+1. The algorithm starts with **all cards** from the input deck
+2. It iteratively removes the **lowest-ranked cards** until reaching 60 mainboard + 15 sideboard
+3. Output is written to `control_generated.txt`
+
+<Note>
+The `-s` flag switches to subtractive mode. This is useful when your input decks are already close to optimal and you want to refine them.
+</Note>
+
+---
+
+## Example 3: Building from a Seed Deck
+
+Start with cards you already own or want to include, then build around them.
+
+### Seed File
+
+**my_cards.txt:**
+```txt
+// Cards I already own
+4 Lightning Bolt
+4 Monastery Swiftspear
+10 Mountain
+```
+
+### Reference Decks
+
+**meta1.txt, meta2.txt, meta3.txt:**
+```txt
+// Multiple tournament-winning decklists
+4 Lightning Bolt
+4 Monastery Swiftspear
+4 Goblin Guide
+// ... (complete decklists)
+```
+
+### Command
+
+```bash
+mtg-builder -i my_cards.txt -o complete_deck.txt meta*.txt
+```
+
+### Result
+
+The additive algorithm:
+1. **Starts with** the 18 cards from `my_cards.txt`
+2. **Analyzes** all cards from `meta*.txt` files
+3. **Adds** the best-ranked cards to reach 60 mainboard + 15 sideboard
+4. **Ensures** your seed cards are included in the final deck
+
+<Warning>
+The `-i` (input-seed) option only works with the **additive algorithm** (default). It has no effect when using `-s` (subtractive).
+</Warning>
+
+---
+
+## Example 4: Adjusting Ranking Precision
+
+Higher ranking precision provides more accurate analysis at the cost of computation time.
+
+### Input File
+
+**combo_deck.txt:**
+```txt
+4 Splinter Twin
+4 Deceiver Exarch
+4 Pestermite
+4 Snapcaster Mage
+4 Lightning Bolt
+3 Remand
+3 Spell Snare
+2 Cryptic Command
+// ... (complete list)
+```
+
+### Commands with Different Precision
+
+<CodeGroup>
+```bash Default (rank 3)
+mtg-builder -r 3 -o deck_rank3.txt combo_deck.txt
+```
+
+```bash Higher precision (rank 4)
+mtg-builder -r 4 -o deck_rank4.txt combo_deck.txt
+```
+
+```bash Maximum precision (rank 5)
+mtg-builder -r 5 -o deck_rank5.txt combo_deck.txt
+```
+</CodeGroup>
+
+### Performance Comparison
+
+| Ranking Order | Computation Time | Accuracy |
+|---------------|------------------|----------|
+| 2 | Fast (~5s) | Lower |
+| 3 (default) | Moderate (~15s) | Good |
+| 4 | Slow (~60s) | Better |
+| 5 | Very slow (~5min) | Best |
+
+<Note>
+Times are approximate and depend on input size and system performance. Rank 3 is usually sufficient for most decks.
+</Note>
+
+---
+
+## Example 5: Verbose Output for Debugging
+
+Use verbose mode to see what the tool is doing.
+
+### Command
+
+```bash
+mtg-builder -v -o output.txt deck1.txt deck2.txt deck3.txt
+```
+
+### Console Output (stderr)
+
+```
+Hello!
+Parsing deck: deck1.txt
+Parsing deck: deck2.txt
+Parsing deck: deck3.txt
+Final size: 75
+4 Lightning Bolt
+4 Monastery Swiftspear
+4 Goblin Guide
+// ... (complete generated deck)
+```
+
+### What Verbose Mode Shows
+
+- **Greeting message** (app/Main.hs:100)
+- **Parsing progress** for each input file (src/MTGBuilder/Parser.hs:73)
+- **Final deck size** (should be 75: 60 mainboard + 15 sideboard) (app/Main.hs:109)
+- **Generated deck list** echoed to stderr (app/Main.hs:112)
+
+<Note>
+Verbose output goes to **stderr**, while the deck file goes to **stdout** (or the file specified with `-o`). This allows you to redirect output separately if needed.
+</Note>
+
+---
+
+## Example 6: Saving Ranking Information
+
+Save internal ranking data for analysis and debugging.
+
+### Command
+
+```bash
+mtg-builder -f rankings.txt -o deck.txt input1.txt input2.txt
+```
+
+### Output Files
+
+**deck.txt:**
+```txt
+// Generated deck (normal output)
+4 Lightning Bolt
+4 Monastery Swiftspear
+// ...
+```
+
+**rankings.txt:**
+```txt
+// Internal ranking information
+// Shows how the algorithm ranked each card
+// Useful for understanding deck generation decisions
+```
+
+### Use Cases
+
+- **Algorithm debugging:** Understand why certain cards were chosen
+- **Tuning:** Adjust input decks based on ranking insights
+- **Analysis:** Study card synergies and interaction patterns
+
+---
+
+## Example 7: Complete Workflow
+
+A comprehensive example combining multiple options.
+
+### Project Structure
+
+```
+decks/
+├── meta/
+│   ├── tournament1.txt
+│   ├── tournament2.txt
+│   └── tournament3.txt
+├── my_collection.txt
+└── output/
+    ├── generated_deck.txt
+    └── rankings.txt
+```
+
+### Command
+
+```bash
+mtg-builder \
+  -i my_collection.txt \
+  -o output/generated_deck.txt \
+  -r 4 \
+  -f output/rankings.txt \
+  -v \
+  meta/*.txt
+```
+
+### Step-by-Step Execution
+
+1. **Reads seed cards** from `my_collection.txt`
+2. **Parses tournament decks** from `meta/` directory (verbose output shows progress)
+3. **Computes 4th-order rankings** for all cards
+4. **Saves ranking data** to `output/rankings.txt`
+5. **Generates deck** using additive algorithm starting from seed cards
+6. **Writes final deck** to `output/generated_deck.txt`
+7. **Displays** final deck and size info to console (verbose mode)
+
+### Console Output
+
+```bash
+Hello!
+Parsing deck: meta/tournament1.txt
+Parsing deck: meta/tournament2.txt
+Parsing deck: meta/tournament3.txt
+Final size: 75
+4 Lightning Bolt
+4 Monastery Swiftspear
+# ... (full deck list)
+```
+
+---
+
+## Example 8: Working with Sideboard Cards
+
+Generate a deck that properly handles sideboard cards from input.
+
+### Input File with Sideboard
+
+**competitive.txt:**
+```txt
+// Main deck
+4 Lightning Bolt
+4 Monastery Swiftspear
+4 Goblin Guide
+4 Eidolon of the Great Revel
+4 Lava Spike
+4 Rift Bolt
+4 Boros Charm
+4 Skewer the Critics
+4 Light Up the Stage
+12 Mountain
+4 Sacred Foundry
+4 Bloodstained Mire
+4 Wooded Foothills
+
+// Sideboard
+SB: 3 Deflecting Palm
+SB: 2 Path to Exile
+SB: 2 Relic of Progenitus
+SB: 3 Smash to Smithereens
+SB: 2 Wear // Tear
+SB: 3 Kor Firewalker
+```
+
+### Command
+
+```bash
+mtg-builder -o final_deck.txt competitive.txt
+```
+
+### Result
+
+The tool recognizes sideboard cards (marked with `SB:`) and includes them appropriately in the generated deck's sideboard section (15 cards total).
+
+---
+
+## Tips for Best Results
+
+<Accordion title="Use Multiple Input Decks">
+The ranking algorithm works best with **3+ input decks** that represent different strategies or variations of an archetype. More data leads to better card rankings.
+</Accordion>
+
+<Accordion title="Choose the Right Algorithm">
+- **Additive (default):** Best when building a new deck from scratch or from a small seed
+- **Subtractive (`-s`):** Best when refining existing competitive decks
+</Accordion>
+
+<Accordion title="Experiment with Precision">
+Start with the default (`-r 3`). Only increase to 4-5 if you need marginal improvements and have time to wait.
+</Accordion>
+
+<Accordion title="Use Verbose Mode for Learning">
+The `-v` flag helps you understand what the tool is doing and verify that input files are being parsed correctly.
+</Accordion>

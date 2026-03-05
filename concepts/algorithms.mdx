@@ -1,0 +1,234 @@
+---
+title: 'Deck Composition Algorithms'
+description: 'Learn how MTGBuilder uses subtractive and additive algorithms to generate optimal Magic: The Gathering decks'
+---
+
+MTGBuilder implements two distinct algorithms for composing decks from multiple input decklists. Both algorithms use the same ranking system but approach deck construction from opposite directions.
+
+<Info>
+For a detailed explanation of the mathematical foundations, read the [blog post explanation](http://elvishjerricco.github.io/2015/09/24/automatically-generating-magic-decks.html).
+</Info>
+
+## Algorithm Overview
+
+<Tabs>
+  <Tab title="Subtractive">
+    **Start with everything, remove the worst**
+    
+    The subtractive algorithm begins with the union of all input decks and iteratively removes the lowest-ranked cards until reaching the target deck size.
+    
+    - Default in earlier versions
+    - Good for preserving popular combinations
+    - Slower performance on large deck collections
+  </Tab>
+  <Tab title="Additive">
+    **Start with nothing, add the best**
+    
+    The additive algorithm begins with an empty deck (or seed cards) and iteratively adds the highest-ranked cards until reaching the target deck size.
+    
+    - Current default algorithm
+    - Better performance
+    - Allows specifying seed cards to build around
+  </Tab>
+</Tabs>
+
+## Subtractive Algorithm
+
+The subtractive algorithm is implemented in the `composeDecks` function (Deck.hs:116-137).
+
+### How It Works
+
+<Steps>
+  <Step title="Union all input decks">
+    Create a starting pool by combining all cards from every input deck. If two decks each run 4 Lightning Bolts, the union contains 4 Lightning Bolts (not 8).
+    
+    ```haskell
+    -- From Deck.hs:119
+    compose startSize $ Set.unions $ inputDecks ranking
+    ```
+  </Step>
+  
+  <Step title="Rank every card">
+    Calculate rankings for all cards in the current pool using the ranking system. Each card receives a score based on its combinations.
+  </Step>
+  
+  <Step title="Remove the lowest-ranked card">
+    Identify and remove the card with the lowest ranking score.
+    
+    ```haskell
+    -- From Deck.hs:133-134
+    (worstRank, worstCard) = head $ Set.toList sorted
+    sorted = Set.filter filt $ sortWithRanking ranking cards
+    ```
+  </Step>
+  
+  <Step title="Repeat until target size">
+    Continue removing the worst card until the deck reaches the desired mainboard and sideboard sizes.
+    
+    ```haskell
+    -- From Deck.hs:122-123
+    compose (main, side) cards
+        | main <= mainSize && side <= sideSize = return cards
+        | otherwise = ...
+    ```
+  </Step>
+</Steps>
+
+<Note>
+**Card Copy Handling**: Different copies of the same card (e.g., Bolt #1, Bolt #2) are treated as distinct during ranking, but the same copies from different decks are merged during the union operation.
+</Note>
+
+### When to Use Subtractive
+
+Use the `--subtractive` flag when:
+- You want to preserve as many popular card combinations as possible
+- You're aggregating a small number of similar decks
+- Performance is not a critical concern
+
+## Additive Algorithm
+
+The additive algorithm is implemented in the `composeAdditive` function (Deck.hs:171-199). This is the **default algorithm** due to performance benefits and added capabilities.
+
+### How It Works
+
+<Steps>
+  <Step title="Start with seed deck">
+    Begin with an empty deck or a seed deck specified via `--input-seed`. This allows you to build around specific cards.
+    
+    ```haskell
+    -- From Deck.hs:171-174
+    composeAdditive :: Ranking -> (Int, Int) -> Deck -> ReaderT Options IO Deck
+    composeAdditive ranking (mainSize, sideSize) startDeck =
+        let startState = foldl (\(m, s) c -> ...) (0, 0) startDeck
+        in  composeAdditive' startState startDeck
+    ```
+  </Step>
+  
+  <Step title="Find the best card to add">
+    Calculate which card from the ranking would add the most value to the current deck.
+    
+    ```haskell
+    -- From Deck.hs:188
+    (bestRank, bestCard) = minimumBy (flip compare) (swap <$> Map.toList rankMap)
+    ```
+  </Step>
+  
+  <Step title="Add the card to the deck">
+    Insert the highest-ranked card into the deck.
+    
+    ```haskell
+    -- From Deck.hs:183
+    composeAdditive' newSize (bestCard `Set.insert` deck)
+    ```
+  </Step>
+  
+  <Step title="Repeat until target size">
+    Continue adding the best available card until reaching the desired deck size.
+    
+    ```haskell
+    -- From Deck.hs:177-178
+    | main >= mainSize && side >= sideSize = return deck
+    | otherwise = ...
+    ```
+  </Step>
+</Steps>
+
+### Key Differences
+
+The additive algorithm has a critical optimization in how it ranks cards:
+
+```haskell
+-- From Deck.hs:193-198
+rankCombo map combo count
+    | Set.size dif == 1 = Map.insertWith (+) (Set.elemAt 0 dif) rank map
+    | otherwise = map
+    where
+        dif = combo `Set.difference` deck
+        rank = fromIntegral count * 1.0 / (2.0 ^ Set.size combo)
+```
+
+It only considers combinations where exactly **one card** is missing from the current deck. This dramatically reduces computation while maintaining accuracy.
+
+### Advantages of Additive
+
+<Accordion title="Performance Benefits">
+  The additive algorithm is significantly faster because:
+  - It only evaluates combinations that are one card away from the current deck
+  - The search space shrinks as valid combinations decrease
+  - Early iterations process much smaller datasets
+</Accordion>
+
+<Accordion title="Seed Card Support">
+  You can specify starting cards with the `--input-seed` flag:
+  
+  ```bash
+  mtg-builder -i seed.txt -o output.txt deck1.txt deck2.txt deck3.txt
+  ```
+  
+  This builds a deck that includes your seed cards and fills the rest optimally.
+</Accordion>
+
+<Accordion title="Better for Diverse Input">
+  When aggregating decks from multiple archetypes, the additive approach tends to produce more coherent results by building up synergies rather than trying to preserve everything.
+</Accordion>
+
+## Visual Comparison
+
+```
+SUBTRACTIVE ALGORITHM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Start: [All cards from all decks]
+   ↓   Remove lowest-ranked
+      [Deck minus 1 card]
+   ↓   Remove lowest-ranked
+      [Deck minus 2 cards]
+   ↓   ...
+ End:  [Exactly N cards]
+
+ADDITIVE ALGORITHM
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Start: [Empty or seed deck]
+   ↓   Add highest-ranked
+      [1 card]
+   ↓   Add highest-ranked
+      [2 cards]
+   ↓   ...
+ End:  [Exactly N cards]
+```
+
+## Choosing an Algorithm
+
+| Use Case | Recommended Algorithm | Reason |
+|----------|----------------------|--------|
+| General deck building | **Additive** | Better performance, default behavior |
+| Building around specific cards | **Additive** | Supports seed decks via `--input-seed` |
+| Large deck collections (100+ decks) | **Additive** | Significantly faster |
+| Preserving all popular synergies | **Subtractive** | Starts with full combination space |
+| Single archetype aggregation | **Either** | Both work well with similar inputs |
+
+## Command Line Usage
+
+<CodeGroup>
+```bash Additive (Default)
+mtg-builder -o output.txt deck1.txt deck2.txt deck3.txt
+```
+
+```bash Additive with Seed
+mtg-builder -i seed.txt -o output.txt deck1.txt deck2.txt
+```
+
+```bash Subtractive
+mtg-builder --subtractive -o output.txt deck1.txt deck2.txt
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Ranking System" icon="chart-line" href="/concepts/ranking-system">
+    Learn how cards are ranked using Nth-order combinations
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/usage/commands">
+    Complete command-line options reference
+  </Card>
+</CardGroup>

@@ -1,0 +1,190 @@
+---
+title: "Installation"
+description: "Install MTGBuilder and its dependencies to start generating Magic: The Gathering decks"
+---
+
+## Prerequisites
+
+### Haskell Platform
+
+MTGBuilder requires the Haskell Platform to be installed on your system. The Haskell Platform includes GHC (Glasgow Haskell Compiler) and Cabal, the package manager and build system.
+
+<Steps>
+  <step>
+    **Download the Haskell Platform**
+    
+    Visit [https://www.haskell.org/platform/](https://www.haskell.org/platform/) and download the installer for your operating system:
+    - **macOS**: Use Homebrew or the official installer
+    - **Linux**: Use your distribution's package manager
+    - **Windows**: Download the Windows installer
+  </step>
+  
+  <step>
+    **Verify Installation**
+    
+    After installing, verify that Cabal is available:
+    
+    ```bash
+    cabal --version
+    ```
+    
+    You should see output indicating Cabal version 2.0 or higher.
+  </step>
+  
+  <step>
+    **Update Cabal Package List**
+    
+    Update the package index to ensure you can access the latest packages:
+    
+    ```bash
+    cabal update
+    ```
+  </step>
+</Steps>
+
+## Installing MTGBuilder
+
+Once the Haskell Platform is set up, install MTGBuilder using Cabal:
+
+```bash
+cabal install MTGBuilder
+```
+
+<Info>
+Cabal will automatically download and compile MTGBuilder along with its dependencies: `parsec`, `containers`, and `mtl`. This process may take several minutes.
+</Info>
+
+## Verification
+
+After installation completes, verify that MTGBuilder is working correctly:
+
+<Steps>
+  <step>
+    **Check Installation**
+    
+    Run the help command:
+    
+    ```bash
+mtg-builder --help
+    ```
+    
+    You should see the usage information and available options.
+  </step>
+  
+  <step>
+    **Check Version**
+    
+    Verify the installed version:
+    
+    ```bash
+mtg-builder --version
+    ```
+    
+    Expected output:
+    ```
+    Version 0.2.0.1
+    ```
+  </step>
+</Steps>
+
+## System Requirements
+
+<Accordion title="Minimum Requirements">
+  - **Operating System**: Linux, macOS, or Windows
+  - **Memory**: 1 GB RAM minimum (2 GB recommended for large deck collections)
+  - **Disk Space**: ~500 MB for Haskell Platform and MTGBuilder
+  - **GHC Version**: 7.10 or higher (included with Haskell Platform)
+</Accordion>
+
+<Accordion title="Dependencies">
+  MTGBuilder depends on the following Haskell libraries (installed automatically):
+  
+  - **base** (>= 4.7 && < 5)
+  - **parsec**: For parsing deck list files
+  - **containers**: For efficient set and map data structures
+  - **mtl**: For monad transformers (Reader, State)
+  
+  These are specified in `MTGBuilder.cabal:22-26` and will be resolved by Cabal during installation.
+</Accordion>
+
+## Troubleshooting
+
+### Cabal Not Found
+
+<Warning>
+If you receive a "command not found" error for `cabal`, ensure the Haskell Platform installation completed successfully and that Cabal's bin directory is in your PATH.
+</Warning>
+
+**On Linux/macOS:**
+```bash
+export PATH="$HOME/.cabal/bin:$PATH"
+```
+
+Add this line to your `~/.bashrc` or `~/.zshrc` to make it permanent.
+
+**On Windows:**
+Add `%APPDATA%\cabal\bin` to your system PATH environment variable.
+
+### MTGBuilder Not Found After Installation
+
+If `mtg-builder` command is not found after installation:
+
+1. Verify the executable was installed:
+   ```bash
+   ls ~/.cabal/bin/MTGBuilder-exe
+   ```
+
+2. The executable may be named `MTGBuilder-exe` instead of `mtg-builder`. Create an alias:
+   ```bash
+   alias mtg-builder='MTGBuilder-exe'
+   ```
+
+### Compilation Errors
+
+If you encounter compilation errors during installation:
+
+1. **Update GHC**: Ensure you're using GHC 7.10 or higher
+2. **Clean Cabal Cache**: Try cleaning and reinstalling:
+   ```bash
+   cabal clean
+   cabal update
+   cabal install MTGBuilder
+   ```
+
+3. **Check Dependencies**: Some dependencies may have version conflicts. Try:
+   ```bash
+   cabal install --allow-newer MTGBuilder
+   ```
+
+### Memory Issues
+
+<Note>
+If compilation fails due to memory constraints, you can adjust GHC's memory limits:
+
+```bash
+cabal install MTGBuilder --ghc-options="+RTS -M2G -RTS"
+```
+
+This limits GHC to 2GB of memory during compilation.
+</Note>
+
+## Building from Source
+
+For development or if you want to modify MTGBuilder, you can clone and build from source:
+
+```bash
+git clone https://github.com/ElvishJerricco/MTGBuilder.git
+cd MTGBuilder
+cabal build
+cabal install
+```
+
+<Info>
+The source repository is available at [github.com/ElvishJerricco/MTGBuilder](https://github.com/ElvishJerricco/MTGBuilder) under a BSD3 license.
+</Info>
+
+## Next Steps
+
+<Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+  Now that MTGBuilder is installed, learn how to generate your first deck
+</Card>

@@ -1,0 +1,260 @@
+---
+title: 'Input File Format'
+description: 'Specification for MTGBuilder deck list file format'
+---
+
+## Overview
+
+MTGBuilder uses a simple text-based format for deck lists. Each line specifies a card quantity and name, with optional set information and sideboard designation.
+
+## Basic Card Format
+
+The standard format for a card entry is:
+
+```
+<quantity> [set_code] <card_name>
+```
+
+### Components
+
+<ParamField path="quantity" type="number" required>
+  The number of copies of this card in the deck. Must be a positive integer.
+</ParamField>
+
+<ParamField path="set_code" type="string">
+  Optional set code in square brackets. Can be used to specify which printing of a card to use.
+  
+  **Note:** Currently parsed but not used in deck generation logic.
+</ParamField>
+
+<ParamField path="card_name" type="string" required>
+  The name of the card. Everything after the quantity (and optional set code) until the end of the line is treated as the card name.
+</ParamField>
+
+## Examples
+
+### Simple Card Entries
+
+```txt
+4 Lightning Bolt
+2 Counterspell
+1 Black Lotus
+20 Island
+```
+
+### With Set Codes
+
+```txt
+4 [M21] Llanowar Elves
+3 [AFR] Adult Gold Dragon
+2 [LEA] Black Lotus
+```
+
+### Set Code Without Specific Set
+
+You can also use empty brackets if needed:
+
+```txt
+4 [] Lightning Bolt
+```
+
+## Sideboard Format
+
+There are two ways to specify sideboard cards:
+
+### Method 1: SB: Prefix
+
+Prefix any card line with `SB:` to mark it as a sideboard card:
+
+```txt
+4 Lightning Bolt
+3 Counterspell
+
+SB: 2 Red Elemental Blast
+SB: 3 Pyroblast
+SB: 4 [MH2] Dress Down
+```
+
+**Source:** src/MTGBuilder/Parser.hs:57-60
+
+### Method 2: Sideboard Section
+
+Use the `Sideboard` keyword to mark all following cards as sideboard cards:
+
+```txt
+4 Lightning Bolt
+3 Counterspell
+20 Mountain
+
+Sideboard
+2 Red Elemental Blast
+3 Pyroblast
+4 Smash to Smithereens
+```
+
+**Source:** src/MTGBuilder/Parser.hs:62-65
+
+<Note>
+Both sideboard methods can be used in the same file, and all sideboard cards will be properly marked.
+</Note>
+
+## Comments
+
+Use `//` for single-line comments:
+
+```txt
+// Main deck creatures
+4 Delver of Secrets
+4 Monastery Swiftspear
+
+// Burn spells
+4 Lightning Bolt
+4 Lava Spike
+
+// This card is under consideration
+// 2 Price of Progress
+```
+
+**Source:** src/MTGBuilder/Parser.hs:23 (commentLine definition)
+
+## Complete Example Deck
+
+Here's a complete example of a properly formatted deck file:
+
+```txt
+// Modern Burn Deck
+// Main Deck
+
+// Creatures
+4 Monastery Swiftspear
+4 Eidolon of the Great Revel
+4 Goblin Guide
+
+// Burn Spells
+4 Lightning Bolt
+4 Lava Spike
+4 Rift Bolt
+4 Boros Charm
+3 Skewer the Critics
+
+// Utility
+4 Light Up the Stage
+
+// Lands
+4 [ZEN] Arid Mesa
+4 Bloodstained Mire
+2 Wooded Foothills
+3 Mountain
+2 Sacred Foundry
+2 Sunbaked Canyon
+
+// Sideboard cards with SB: prefix
+SB: 3 Deflecting Palm
+SB: 2 Path to Exile
+SB: 2 Relic of Progenitus
+
+// Alternative sideboard section
+Sideboard
+3 Smash to Smithereens
+2 Wear // Tear
+3 Kor Firewalker
+```
+
+## Formatting Rules
+
+<Accordion title="Case Sensitivity">
+Card names are **case-insensitive** according to the parser configuration.
+
+**Source:** src/MTGBuilder/Parser.hs:24
+
+```txt
+4 lightning bolt
+4 Lightning Bolt
+4 LIGHTNING BOLT
+```
+
+All three lines above are treated identically.
+</Accordion>
+
+<Accordion title="Whitespace">
+Whitespace at the beginning and end of lines is automatically ignored. Extra whitespace between the quantity and card name is also handled gracefully.
+
+```txt
+4 Lightning Bolt
+  4   Lightning Bolt
+4     Lightning Bolt
+```
+
+All three formats are valid.
+</Accordion>
+
+<Accordion title="Line Endings">
+Both Unix (`\n`) and Windows (`\r\n`) line endings are supported.
+</Accordion>
+
+## Common Formatting Errors
+
+<Warning>
+**Missing Quantity**
+
+```txt
+Lightning Bolt  // ERROR: No quantity specified
+```
+
+Every card line must start with a number.
+</Warning>
+
+<Warning>
+**Invalid Quantity**
+
+```txt
+two Lightning Bolt  // ERROR: Quantity must be numeric
+4.5 Lightning Bolt  // ERROR: Quantity must be an integer
+```
+
+Quantities must be positive integers.
+</Warning>
+
+<Warning>
+**Malformed Set Codes**
+
+```txt
+4 [M21 Lightning Bolt   // ERROR: Missing closing bracket
+4 M21] Lightning Bolt   // ERROR: Missing opening bracket
+```
+
+If using set codes, both brackets are required.
+</Warning>
+
+<Warning>
+**Incorrect Comment Syntax**
+
+```txt
+# This is not a valid comment
+-- This is also not valid
+/* Neither is this */
+
+// Only double-slash comments work
+```
+
+Only `//` style comments are supported.
+</Warning>
+
+## Parser Implementation
+
+The deck parser is implemented in `src/MTGBuilder/Parser.hs` using Parsec, a monadic parser combinator library. Key implementation details:
+
+- **Token parser:** src/MTGBuilder/Parser.hs:21-25
+- **Main deck parser:** src/MTGBuilder/Parser.hs:35-38
+- **Card parser:** src/MTGBuilder/Parser.hs:43-52
+- **Sideboard parsers:** src/MTGBuilder/Parser.hs:57-65
+
+## File Extensions
+
+MTGBuilder accepts any text file format. Common conventions include:
+
+- `.txt` - Plain text deck lists
+- `.dec` - Deck files
+- No extension - Also accepted
+
+The parser reads the file content regardless of extension.

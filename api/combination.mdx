@@ -1,0 +1,222 @@
+---
+title: "MTGBuilder.Combination"
+description: "Generate k-combinations of cards for ranking calculations"
+---
+
+# MTGBuilder.Combination
+
+The `MTGBuilder.Combination` module provides a function for generating all k-combinations from a set of elements. This is used internally by the ranking algorithm to compute card interaction scores.
+
+## Overview
+
+A **k-combination** is a subset of k elements from a larger set, where order doesn't matter. For example, the 2-combinations of {A, B, C} are:
+
+- {A, B}
+- {A, C}
+- {B, C}
+
+In MTGBuilder, combinations are used to identify which groups of cards appear together across multiple decks. For instance, if computing 2nd-order rankings, the algorithm finds all pairs of cards and counts how many input decks contain each pair.
+
+## Functions
+
+### combinations
+
+Generates all k-combinations of elements from a set.
+
+```haskell
+combinations :: Ord a => Int -> Set a -> Set (Set a)
+```
+
+<ParamField path="k" type="Int" required>
+  The size of each combination (order). Must be non-negative.
+  - `k = 0`: Returns a single empty set
+  - `k = 1`: Returns all singleton sets (each element by itself)
+  - `k = 2`: Returns all pairs
+  - `k >= size of set`: Returns the entire set as a single combination
+</ParamField>
+
+<ParamField path="set" type="Set a" required>
+  The input set to generate combinations from. Elements must be `Ord` (orderable).
+</ParamField>
+
+<ResponseField name="return" type="Set (Set a)">
+  A set of sets, where each inner set is a k-combination of the input elements.
+</ResponseField>
+
+## Algorithm
+
+The implementation uses a recursive algorithm:
+
+```haskell
+combinations k xs = combinations' (Set.size xs) k xs
+    where combinations' n k' s
+            | k' == 0   = Set.singleton Set.empty
+            | k' >= n   = Set.singleton s
+            | null s    = Set.empty
+            | otherwise = case Set.minView s of
+                Just (y, ys)    -> Set.map (Set.insert y) (combinations' (n-1) (k'-1) ys) 
+                                   `Set.union` 
+                                   combinations' (n-1) k' ys
+                Nothing         -> error "Invalid empty set"
+```
+
+**Algorithm breakdown:**
+
+1. **Base case (k = 0)**: Return a set containing the empty set
+2. **Base case (k ≥ n)**: Return the entire input set
+3. **Base case (empty set)**: Return empty set
+4. **Recursive case**: For the smallest element y:
+   - Generate all (k-1)-combinations of remaining elements and add y to each
+   - Union with all k-combinations of remaining elements (without y)
+
+## Examples
+
+### Basic Usage
+
+```haskell
+import MTGBuilder.Combination
+import qualified Data.Set as Set
+
+-- Generate all pairs from {1, 2, 3}
+let nums = Set.fromList [1, 2, 3]
+let pairs = combinations 2 nums
+print pairs
+-- Output: fromList [fromList [1,2], fromList [1,3], fromList [2,3]]
+
+-- Generate all singletons
+let singles = combinations 1 nums
+print singles  
+-- Output: fromList [fromList [1], fromList [2], fromList [3]]
+
+-- k = 0 returns empty set
+let empty = combinations 0 nums
+print empty
+-- Output: fromList [fromList []]
+```
+
+### Usage with Cards
+
+```haskell
+import MTGBuilder.Combination
+import MTGBuilder.Deck
+import qualified Data.Set as Set
+
+-- Create a simple deck
+let bolt1 = MkCard "Lightning Bolt" 1 False
+let bolt2 = MkCard "Lightning Bolt" 2 False  
+let snap = MkCard "Snapcaster Mage" 1 False
+let deck = Set.fromList [bolt1, bolt2, snap]
+
+-- Generate all 2-card combinations
+let pairs = combinations 2 deck
+print $ Set.size pairs  -- Output: 3
+-- Pairs are:
+-- {Lightning Bolt #1, Lightning Bolt #2}
+-- {Lightning Bolt #1, Snapcaster Mage #1}
+-- {Lightning Bolt #2, Snapcaster Mage #1}
+
+-- Generate all 3-card combinations
+let triples = combinations 3 deck
+print $ Set.size triples  -- Output: 1
+-- Only one triple: the entire deck
+```
+
+### Multi-Order Ranking
+
+```haskell
+import MTGBuilder.Combination
+import qualified Data.Set as Set
+
+-- Generate all combinations up to order 3
+let deck = Set.fromList [card1, card2, card3, card4]
+let allCombos = Set.unions [combinations n deck | n <- [1..3]]
+
+-- This gives us:
+-- - 4 singletons (1st order)
+-- - 6 pairs (2nd order) 
+-- - 4 triples (3rd order)
+-- Total: 14 combinations
+print $ Set.size allCombos  -- Output: 14
+```
+
+## Performance Characteristics
+
+The number of k-combinations from a set of size n is given by the binomial coefficient:
+
+**C(n, k) = n! / (k! × (n-k)!)**
+
+### Time Complexity
+
+- **Time**: O(C(n, k)) - proportional to the number of combinations generated
+- **Space**: O(C(n, k)) - stores all combinations in memory
+
+### Combination Counts
+
+For a typical deck of 75 unique cards:
+
+| Order (k) | Combinations | Notes |
+|-----------|--------------|-------|
+| 1 | 75 | Fast, least precise |
+| 2 | 2,775 | Recommended default |
+| 3 | 67,525 | Slower but more precise |
+| 4 | 1,215,450 | Usually impractical |
+
+**Recommendation:** Use k=2 for most applications. Higher orders provide diminishing returns while dramatically increasing computation time and memory usage.
+
+## Usage in MTGBuilder
+
+The `combinations` function is used internally by `makeRanking` in the `MTGBuilder.Deck` module:
+
+```haskell
+-- From Deck.hs:84
+Set.unions [combinations n deck | n <- [1..(interactionSize ranking)]]
+```
+
+This generates all combinations up to the specified interaction size for each input deck, which are then used to build the popularity ranking.
+
+### Ranking Example
+
+When processing decks with 2nd-order rankings:
+
+1. For each input deck, generate all 1-combinations and 2-combinations
+2. For each combination, increment its count in the ranking map
+3. Cards appearing in popular combinations receive higher scores
+4. The composition algorithm uses these scores to build the aggregate deck
+
+```haskell
+-- Simplified ranking logic
+for each deck:
+    let combos = combinations 1 deck ∪ combinations 2 deck
+    for each combo in combos:
+        ranking[combo] += 1
+```
+
+## Mathematical Background
+
+### Binomial Coefficient Formula
+
+The number of ways to choose k items from n items:
+
+```
+C(n, k) = n! / (k! × (n-k)!)
+```
+
+### Properties
+
+- **C(n, 0) = 1**: One way to choose nothing
+- **C(n, 1) = n**: n ways to choose one item  
+- **C(n, k) = C(n, n-k)**: Symmetry property
+- **C(n, n) = 1**: One way to choose everything
+
+### Recursive Formula
+
+```
+C(n, k) = C(n-1, k-1) + C(n-1, k)
+```
+
+This is the formula implemented by the `combinations` function: either include the first element (choose k-1 from the rest) or exclude it (choose k from the rest).
+
+## See Also
+
+- [MTGBuilder.Deck](/api/deck) - Uses combinations for ranking
+- [Wikipedia: Combination](https://en.wikipedia.org/wiki/Combination) - Mathematical background
