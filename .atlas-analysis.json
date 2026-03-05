@@ -1,0 +1,77 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "MTGBuilder",
+  "projectDescription": "Automatically generates Magic: The Gathering decks using algorithmic ranking systems",
+  "theme": "aspen",
+  "primaryColor": "#8B5CF6",
+  "lightColor": null,
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Usage",
+            "pages": [
+              "usage/commands",
+              "usage/input-format",
+              "usage/examples"
+            ]
+          },
+          {
+            "group": "Concepts",
+            "pages": [
+              "concepts/algorithms",
+              "concepts/ranking-system"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Library Modules",
+            "pages": [
+              "api/deck",
+              "api/parser",
+              "api/combination",
+              "api/options"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Additive and subtractive deck composition algorithms",
+    "Nth-order ranking system for card popularity analysis",
+    "Support for mainboard and sideboard cards",
+    "Seed deck input for building around specific cards",
+    "Configurable precision for ranking calculations"
+  ],
+  "publicApiSurface": [
+    "mtg-builder -o FILE --output=FILE",
+    "mtg-builder -i FILE --input-seed=FILE",
+    "mtg-builder -r NUMBER --ranking=NUMBER",
+    "mtg-builder -f FILE --ranking-file=FILE",
+    "mtg-builder -v --verbose",
+    "mtg-builder -s --subtractive",
+    "mtg-builder -V --version",
+    "mtg-builder -h --help",
+    "MTGBuilder.Deck.makeRanking",
+    "MTGBuilder.Deck.composeAdditive",
+    "MTGBuilder.Deck.composeDecks",
+    "MTGBuilder.Parser.parseDeckFile",
+    "MTGBuilder.Combination.combinations"
+  ]
+}
